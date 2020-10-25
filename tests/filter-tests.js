@@ -356,6 +356,38 @@ describe('broccoli-asset-rev', function() {
     });
   });
 
+  it('can optionally use caching', async function() {
+    let fixturePath = `${__dirname}/fixtures/js-perf`;
+    let inputPath = `${fixturePath}/input`;
+    
+    let node = new AssetRewrite(inputPath, {
+      assetMap: JSON.parse(fs.readFileSync(`${fixturePath}/asset-map.json`)),
+      replaceExtensions: ['js'],
+      enableCaching: true
+    });
+
+    const fixtureBuilder = new fixture.Builder(node);
+
+    const run1Start = process.hrtime()
+    let outputHash = await fixtureBuilder.build(node);
+    const run1End = process.hrtime(run1Start)
+    assert.deepStrictEqual(outputHash, {
+      'test-support.js': fs.readFileSync(`${fixturePath}/output/test-support.js`).toString()
+    });
+
+    const run2Start = process.hrtime()
+    outputHash = await fixtureBuilder.build(node);
+    const run2End = process.hrtime(run2Start);
+    assert.deepStrictEqual(outputHash, {
+      'test-support.js': fs.readFileSync(`${fixturePath}/output/test-support.js`).toString()
+    });
+    
+    const run1DurationMs = (run1End[0] * 1000000000 + run1End[1]) / 1000000;
+    const run2DurationMs = (run2End[0] * 1000000000 + run2End[1]) / 1000000;
+    assert.ok(run2DurationMs < (run1DurationMs / 2), `cache should make second run (${run2DurationMs}ms) at least twice as fast as first run (${run1DurationMs}ms)`);
+    fixtureBuilder.cleanup();
+  });
+
   it('ignores JavaScript comments with URLs', async function () {
     let inputNode = new fixture.Node({
       'snippet.js': `/**
