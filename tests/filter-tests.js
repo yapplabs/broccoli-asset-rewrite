@@ -429,4 +429,35 @@ describe('broccoli-asset-rev', function() {
       `
     });
   });
+
+  it('when asset map keys and values are the same with prepend', async function(){
+    let inputNode = new fixture.Node({
+      'assets': {
+        'js-with-image.js': `var path = "/assets/baz/bay.jpg";`,
+        'quoted-script-tag.html': `<script src="/assets/foo/bar/widget.js"></script>`,
+        'unquoted-script-tag.html': `<script src=/assets/foo/bar/widget.js></script>`,
+        'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/images/sample.png)}`,
+      }
+    });
+    let node = new AssetRewrite(inputNode, {
+      assetMap: {
+        'assets/foo/bar/widget.js': 'assets/foo/bar/widget.js',
+        'assets/baz/bay.jpg': 'assets/baz/bay.jpg',
+        'images/sample.png': 'images/sample.png'
+      },
+      replaceExtensions: ['css', 'html', 'js'],
+      prepend: 'https://cloudfront.net/'
+    });
+
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'assets': {
+        'js-with-image.js': `var path = "https://cloudfront.net/assets/baz/bay.jpg";`,
+        'quoted-script-tag.html': `<script src="https://cloudfront.net/assets/foo/bar/widget.js"></script>`,
+        'unquoted-script-tag.html': `<script src=https://cloudfront.net/assets/foo/bar/widget.js></script>`,
+        'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(https://cloudfront.net/images/sample.png)}`,
+      }
+    });
+  })
+
 });

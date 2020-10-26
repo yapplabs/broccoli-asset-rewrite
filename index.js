@@ -117,8 +117,12 @@ class AssetRewrite extends Filter {
       if (ignoreLibraryCode.exec(match[1])) {
         continue;
       }
-
-      replaceString = match[1].replace(assetPath, replacementPath);
+      if (match[1].indexOf(replacementPath) === -1) {
+        replaceString = match[1].replace(assetPath, replacementPath);
+      } else {
+        // already replaced
+        replaceString = match[1]; 
+      }
 
       if (this.prepend && replaceString.indexOf(this.prepend) !== 0) {
         var removeLeadingRelativeOrSlashRegex = new RegExp('^(\\.*/)*(.*)$');
