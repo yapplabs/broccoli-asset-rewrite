@@ -1,39 +1,33 @@
-var fs       = require('fs');
-var path     = require('path');
-var assert   = require('assert');
-var walkSync = require('walk-sync');
-var broccoli = require('broccoli');
-
-var AssetRewrite  = require('..');
-
-var builder;
-
-function confirmOutput(actualPath, expectedPath) {
-  var actualFiles = walkSync(actualPath);
-  var expectedFiles = walkSync(expectedPath);
-
-  assert.deepEqual(actualFiles, expectedFiles, 'files output should be the same as those input');
-
-  expectedFiles.forEach(function(relativePath) {
-    if (relativePath.slice(-1) === '/') { return; }
-
-    var actual   = fs.readFileSync(path.join(actualPath, relativePath), { encoding: 'utf8'});
-    var expected = fs.readFileSync(path.join(expectedPath, relativePath), { encoding: 'utf8' });
-
-    assert.equal(actual, expected, relativePath + ': does not match expected output');
-  });
-}
+const fs       = require('fs');
+const assert   = require('assert');
+const fixture = require('broccoli-fixture');
+const AssetRewrite  = require('..');
 
 describe('broccoli-asset-rev', function() {
-  afterEach(function() {
-    if (builder) {
-      builder.cleanup();
-    }
-  });
-
-  it('uses the provided assetMap to replace strings', function(){
-    var sourcePath = 'tests/fixtures/basic';
-    var node = AssetRewrite(sourcePath + '/input', {
+  it('uses the provided assetMap to replace strings', async function(){
+    let inputNode = new fixture.Node({
+      'encoded-meta-tag.html': `<meta name="ember-sample/config/environment" content="%7B%22modulePrefix%22%3A%22ember-sample%22%2C%22environment%22%3A%22development%22%2C%22baseURL%22%3A%22/%22%2C%22locationType%22%3A%22auto%22%2C%22marked%22%3A%7B%22js%22%3A%22/foo/bar/widget.js%22%2C%22highlights%22%3Afalse%7D%2C%22EmberENV%22%3A%7B%22FEATURES%22%3A%7B%7D%7D%2C%22APP%22%3A%7B%22name%22%3A%22ember-sample%22%2C%22version%22%3A%220.0.0.bb29331f%22%7D%2C%22contentSecurityPolicyHeader%22%3A%22Content-Security-Policy-Report-Only%22%2C%22contentSecurityPolicy%22%3A%7B%22default-src%22%3A%22%27none%27%22%2C%22script-src%22%3A%22%27self%27%20%27unsafe-eval%27%22%2C%22font-src%22%3A%22%27self%27%22%2C%22connect-src%22%3A%22%27self%27%22%2C%22img-src%22%3A%22%27self%27%22%2C%22style-src%22%3A%22%27self%27%22%2C%22media-src%22%3A%22%27self%27%22%7D%2C%22exportApplicationGlobal%22%3Atrue%7D" />`,
+      'fonts.css': `@font-face {
+        font-family: OpenSans;
+        font-weight: 100;
+        font-style: normal;
+        src: url('fonts/OpenSans/Light/OpenSans-Light.eot');
+        src: url('fonts/OpenSans/Light/OpenSans-Light.eot?#iefix') format('embedded-opentype'), url('fonts/OpenSans/Light/OpenSans-Light.woff') format('woff'), url('fonts/OpenSans/Light/OpenSans-Light.ttf') format('truetype'), url('fonts/OpenSans/Light/OpenSans-Light.svg#OpenSans') format('svg');
+      }
+      
+      @font-face {
+        font-family: OpenSans;
+        font-weight: 200;
+        font-style: normal;
+        src: url('fonts/OpenSans/Medium/OpenSans-Medium.eot?#iefix');
+        src: url('fonts/OpenSans/Medium/OpenSans-Medium.eot?#iefix') format('embedded-opentype'), url('fonts/OpenSans/Medium/OpenSans-Medium.woff') format('woff'), url('fonts/OpenSans/Medium/OpenSans-Medium.ttf') format('truetype'), url('fonts/OpenSans/Medium/OpenSans-Medium.svg#OpenSans') format('svg');
+      }
+      `,
+      'quoted-script-tag.html': `<script src="foo/bar/widget.js"></script>`,
+      'unquoted-script-tag.html': `<script src=foo/bar/widget.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/sample.png)}`,
+    });
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'foo/bar/widget.js': 'blahzorz-1.js',
         'images/sample.png': 'images/fingerprinted-sample.png',
@@ -48,31 +42,71 @@ describe('broccoli-asset-rev', function() {
       }
     });
 
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function(graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'encoded-meta-tag.html': `<meta name="ember-sample/config/environment" content="%7B%22modulePrefix%22%3A%22ember-sample%22%2C%22environment%22%3A%22development%22%2C%22baseURL%22%3A%22/%22%2C%22locationType%22%3A%22auto%22%2C%22marked%22%3A%7B%22js%22%3A%22/foo/bar/widget.js%22%2C%22highlights%22%3Afalse%7D%2C%22EmberENV%22%3A%7B%22FEATURES%22%3A%7B%7D%7D%2C%22APP%22%3A%7B%22name%22%3A%22ember-sample%22%2C%22version%22%3A%220.0.0.bb29331f%22%7D%2C%22contentSecurityPolicyHeader%22%3A%22Content-Security-Policy-Report-Only%22%2C%22contentSecurityPolicy%22%3A%7B%22default-src%22%3A%22%27none%27%22%2C%22script-src%22%3A%22%27self%27%20%27unsafe-eval%27%22%2C%22font-src%22%3A%22%27self%27%22%2C%22connect-src%22%3A%22%27self%27%22%2C%22img-src%22%3A%22%27self%27%22%2C%22style-src%22%3A%22%27self%27%22%2C%22media-src%22%3A%22%27self%27%22%7D%2C%22exportApplicationGlobal%22%3Atrue%7D" />`,
+      'fonts.css': `@font-face {
+        font-family: OpenSans;
+        font-weight: 100;
+        font-style: normal;
+        src: url('fonts/OpenSans/Light/fingerprinted-OpenSans-Light.eot');
+        src: url('fonts/OpenSans/Light/fingerprinted-OpenSans-Light.eot?#iefix') format('embedded-opentype'), url('fonts/OpenSans/Light/fingerprinted-OpenSans-Light.woff') format('woff'), url('fonts/OpenSans/Light/fingerprinted-OpenSans-Light.ttf') format('truetype'), url('fonts/OpenSans/Light/fingerprinted-OpenSans-Light.svg#OpenSans') format('svg');
+      }
+      
+      @font-face {
+        font-family: OpenSans;
+        font-weight: 200;
+        font-style: normal;
+        src: url('fonts/OpenSans/Medium/fingerprinted-OpenSans-Medium.eot?#iefix');
+        src: url('fonts/OpenSans/Medium/fingerprinted-OpenSans-Medium.eot?#iefix') format('embedded-opentype'), url('fonts/OpenSans/Medium/fingerprinted-OpenSans-Medium.woff') format('woff'), url('fonts/OpenSans/Medium/fingerprinted-OpenSans-Medium.ttf') format('truetype'), url('fonts/OpenSans/Medium/fingerprinted-OpenSans-Medium.svg#OpenSans') format('svg');
+      }
+      `,
+      'quoted-script-tag.html': `<script src="blahzorz-1.js"></script>`,
+      'unquoted-script-tag.html': `<script src=blahzorz-1.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/fingerprinted-sample.png)}`,
     });
   })
 
-  it('ignore option tell filter what files should not be processed', function(){
-    var sourcePath = 'tests/fixtures/with-ignore';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('ignore option tell filter what files should not be processed', async function(){
+    let inputNode = new fixture.Node({
+      'ignore-this-file': `<script src="foo/bar/widget.js"></script>`,
+      'quoted-script-tag.html': `<script src="foo/bar/widget.js"></script>`,
+      'unquoted-script-tag.html': `<script src=foo/bar/widget.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/fingerprinted-sample.png)}`,
+    });
+
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'foo/bar/widget.js': 'blahzorz-1.js',
         'images/sample.png': 'images/fingerprinted-sample.png',
       },
       ignore: ['ignore-this-file.html']
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function(graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'ignore-this-file': `<script src="foo/bar/widget.js"></script>`,
+      'quoted-script-tag.html': `<script src="blahzorz-1.js"></script>`,
+      'unquoted-script-tag.html': `<script src=blahzorz-1.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/fingerprinted-sample.png)}`,
     });
   });
 
-  it('rewrites relative urls', function () {
-    var sourcePath = 'tests/fixtures/relative-urls';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('rewrites relative urls', async function() {
+    let inputNode = new fixture.Node({
+      'assets': {
+        'url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url('images/foobar.png')}
+
+        .sample-img2{width:50px;height:50px;background-image:url('./images/baz.png')}
+        `
+      },
+      'quoted-script-tag.html': `<script src="foo/bar/widget.js"></script>`,
+      'unquoted-script-tag.html': `<script src=foo/bar/widget.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/sample.png)}
+
+      .sample-img2{width:50px;height:50px;background-image:url(./images/sample.png)}
+      `,
+    });
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'foo/bar/widget.js': 'blahzorz-1.js',
         'images/sample.png': 'images/fingerprinted-sample.png',
@@ -81,15 +115,38 @@ describe('broccoli-asset-rev', function() {
       }
     });
 
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'assets': {
+        'url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url('images/foobar-fingerprint.png')}
+
+        .sample-img2{width:50px;height:50px;background-image:url('./images/baz-fingerprint.png')}
+        `,
+      },
+      'quoted-script-tag.html': `<script src="blahzorz-1.js"></script>`,
+      'unquoted-script-tag.html': `<script src=blahzorz-1.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/fingerprinted-sample.png)}
+
+      .sample-img2{width:50px;height:50px;background-image:url(./images/fingerprinted-sample.png)}
+      `,
     });
   });
 
-  it('rewrites relative urls with prepend', function () {
-    var sourcePath = 'tests/fixtures/relative-urls-prepend';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('rewrites relative urls with prepend', async function() {
+    let inputNode = new fixture.Node({
+      'assets': {
+        'no-fingerprint.html': `<script src="dont/fingerprint/me.js"></script>`,
+        'url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url('images/foobar.png')}
+
+        .sample-img2{width:50px;height:50px;background-image:url('../img/saturation.png')}
+        `
+      },
+      'quoted-script-tag.html': `<script src="foo/bar/widget.js"></script>`,
+      'unquoted-script-tag.html': `<script src=foo/bar/widget.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(images/sample.png)}`,
+    });
+
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'foo/bar/widget.js': 'blahzorz-1.js',
         'dont/fingerprint/me.js': 'dont/fingerprint/me.js',
@@ -99,18 +156,38 @@ describe('broccoli-asset-rev', function() {
       },
       prepend: 'https://cloudfront.net/'
     });
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'assets': {
+        'no-fingerprint.html': `<script src="https://cloudfront.net/dont/fingerprint/me.js"></script>`,
+        'url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url('https://cloudfront.net/assets/images/foobar-fingerprint.png')}
 
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+        .sample-img2{width:50px;height:50px;background-image:url('https://cloudfront.net/assets/img/saturation-fingerprint.png')}
+        `,
+      },
+      'quoted-script-tag.html': `<script src="https://cloudfront.net/blahzorz-1.js"></script>`,
+      'unquoted-script-tag.html': `<script src=https://cloudfront.net/blahzorz-1.js></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(https://cloudfront.net/images/fingerprinted-sample.png)}`,
     });
-
   });
 
-  it('replaces the correct match for the file extension', function () {
-    var sourcePath = 'tests/fixtures/extensions';
+  it('replaces the correct match for the file extension', async function () {
+    let inputNode = new fixture.Node({
+      'styles.css': `@font-face {
+        font-family: 'RobotoRegular';
+        src: url('fonts/roboto-regular.eot');
+        src: url('fonts/roboto-regular.eot?#iefix') format('embedded-opentype'),
+          url('fonts/roboto-regular.woff2') format('woff2'),
+          url('fonts/roboto-regular.woff') format('woff'),
+          url('fonts/roboto-regular.ttf') format('truetype'),
+          url('fonts/roboto-regular.svg#robotoregular') format('svg');
+        font-weight: normal;
+        font-style: normal;
+      }
+      `
+    });
 
-    var node = new AssetRewrite(sourcePath + '/input', {
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'fonts/roboto-regular.eot': 'fonts/roboto-regular-f1.eot',
         'fonts/roboto-regular.woff': 'fonts/roboto-regular-f3.woff',
@@ -120,32 +197,50 @@ describe('broccoli-asset-rev', function() {
       }
     });
 
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'styles.css': `@font-face {
+        font-family: 'RobotoRegular';
+        src: url('fonts/roboto-regular-f1.eot');
+        src: url('fonts/roboto-regular-f1.eot?#iefix') format('embedded-opentype'),
+          url('fonts/roboto-regular-f2.woff2') format('woff2'),
+          url('fonts/roboto-regular-f3.woff') format('woff'),
+          url('fonts/roboto-regular-f4.ttf') format('truetype'),
+          url('fonts/roboto-regular-f5.svg#robotoregular') format('svg');
+        font-weight: normal;
+        font-style: normal;
+      }
+      `
     });
   });
 
-  it('replaces source map URLs', function () {
-    var sourcePath = 'tests/fixtures/sourcemaps';
+  it('replaces source map URLs', async function () {
+    let inputNode = new fixture.Node({
+      'abs.js': `(function x(){return 42})//# sourceMappingURL=http://absolute.com/source.map`,
+      'sample.js': `(function x(){return 42})//# sourceMappingURL=the.map`
+    });
 
-    var node = new AssetRewrite(sourcePath + '/input', {
+    let node = new AssetRewrite(inputNode, {
       replaceExtensions: ['js'],
       assetMap: {
         'the.map' : 'the-other-map',
         'http://absolute.com/source.map' : 'http://cdn.absolute.com/other-map'
       }
     });
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'abs.js': `(function x(){return 42})//# sourceMappingURL=http://cdn.absolute.com/other-map`,
+      'sample.js': `(function x(){return 42})//# sourceMappingURL=the-other-map`
     });
   });
 
-  it('replaces source map URLs with prepend', function () {
-    var sourcePath = 'tests/fixtures/sourcemaps-prepend';
+  it('replaces source map URLs with prepend', async function () {
+    let inputNode = new fixture.Node({
+      'abs.js': `(function x(){return 42})//# sourceMappingURL=http://absolute.com/source.map`,
+      'sample.js': `(function x(){return 42})//# sourceMappingURL=the.map`
+    });
 
-    var node = new AssetRewrite(sourcePath + '/input', {
+    let node = new AssetRewrite(inputNode, {
       replaceExtensions: ['js'],
       assetMap: {
         'the.map' : 'the-other-map',
@@ -153,89 +248,163 @@ describe('broccoli-asset-rev', function() {
       },
       prepend: 'https://cloudfront.net/'
     });
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'abs.js': `(function x(){return 42})//# sourceMappingURL=http://cdn.absolute.com/other-map`,
+      'sample.js': `(function x(){return 42})//# sourceMappingURL=https://cloudfront.net/the-other-map`
     });
   });
 
-  it('maintains fragments', function () {
-    var sourcePath = 'tests/fixtures/fragments';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('maintains fragments', async function () {
+    let inputNode = new fixture.Node({
+      'svg-tag.html': `<svg><use xlink:href="/images/defs.svg#plus"></use></svg>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/images/defs.svg#plus)}`
+    });
+
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'images/defs.svg': 'images/fingerprinted-defs.svg'
       }
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'svg-tag.html': `<svg><use xlink:href="/images/fingerprinted-defs.svg#plus"></use></svg>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/images/fingerprinted-defs.svg#plus)}`
     });
   });
 
-  it('maintains fragments with prepend', function () {
-    var sourcePath = 'tests/fixtures/fragments-prepend';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('maintains fragments with prepend', async function () {
+    let inputNode = new fixture.Node({
+      'svg-tag.html': `<svg><use xlink:href="/images/defs.svg#plus"></use></svg>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/images/defs.svg#plus)}`
+    });
+
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'images/defs.svg': 'images/fingerprinted-defs.svg'
       },
       prepend: 'https://cloudfront.net/'
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'svg-tag.html': `<svg><use xlink:href="https://cloudfront.net/images/fingerprinted-defs.svg#plus"></use></svg>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(https://cloudfront.net/images/fingerprinted-defs.svg#plus)}`
     });
   });
 
-  it('replaces absolute URLs with prepend', function () {
-    var sourcePath = 'tests/fixtures/absolute-prepend';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('replaces absolute URLs with prepend', async function () {
+    let inputNode = new fixture.Node({
+      'img-tag.html': `<img src="/my-image.png">`,
+      'no-fingerprint.html': `<script src="dont/fingerprint/me.js"></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/my-image.png)}`
+    });
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'my-image.png': 'my-image-fingerprinted.png',
         'dont/fingerprint/me.js': 'dont/fingerprint/me.js'
       },
       prepend: 'https://cloudfront.net/'
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'img-tag.html': `<img src="https://cloudfront.net/my-image-fingerprinted.png">`,
+      'no-fingerprint.html': `<script src="https://cloudfront.net/dont/fingerprint/me.js"></script>`,
+      'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(https://cloudfront.net/my-image-fingerprinted.png)}`
     });
   });
-
-  it('handles URLs with query parameters in them', function () {
-    var sourcePath = 'tests/fixtures/query-strings';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  
+  it('handles URLs with query parameters in them', async function () {
+    let inputNode = new fixture.Node({
+      'script-tag-with-query-parameters.html': `<script src="foo/bar/widget.js?hello=world"></script>
+      <script src="foo/bar/widget.js?hello=world&amp;foo=bar"></script>
+      <script src=foo/bar/widget.js?hello=world></script>
+      <script src=foo/bar/widget.js?hello=world async></script>
+      `
+    });
+    let node = new AssetRewrite(inputNode, {
       assetMap: {
         'foo/bar/widget.js': 'foo/bar/fingerprinted-widget.js',
         'script-tag-with-query-parameters.html': 'script-tag-with-query-parameters.html',
       },
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'script-tag-with-query-parameters.html': `<script src="foo/bar/fingerprinted-widget.js?hello=world"></script>
+      <script src="foo/bar/fingerprinted-widget.js?hello=world&amp;foo=bar"></script>
+      <script src=foo/bar/fingerprinted-widget.js?hello=world></script>
+      <script src=foo/bar/fingerprinted-widget.js?hello=world async></script>
+      `
     });
   });
 
-  it('handles JavaScript files in a reasonable amount of time', function () {
+  it('handles JavaScript files in a reasonable amount of time', async function () {
     this.timeout(500);
-    var sourcePath = 'tests/fixtures/js-perf';
-    var node = new AssetRewrite(sourcePath + '/input', {
-      assetMap: JSON.parse(fs.readFileSync(__dirname + '/fixtures/js-perf/asset-map.json')),
+    let fixturePath = `${__dirname}/fixtures/js-perf`;
+    let inputNode = new fixture.Node({
+      'test-support.js': fs.readFileSync(`${fixturePath}/input/test-support.js`).toString()
+    });
+
+    let node = new AssetRewrite(inputNode, {
+      assetMap: JSON.parse(fs.readFileSync(`${fixturePath}/asset-map.json`)),
       replaceExtensions: ['js'],
     });
 
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
-    })
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'test-support.js': fs.readFileSync(`${fixturePath}/output/test-support.js`).toString()
+    });
   });
 
-  it('ignores JavaScript comments with URLs', function () {
-    var sourcePath = 'tests/fixtures/js-comment';
-    var node = new AssetRewrite(sourcePath + '/input', {
+  it('can optionally use caching', async function() {
+    let fixturePath = `${__dirname}/fixtures/js-perf`;
+    let inputPath = `${fixturePath}/input`;
+    
+    let node = new AssetRewrite(inputPath, {
+      assetMap: JSON.parse(fs.readFileSync(`${fixturePath}/asset-map.json`)),
+      replaceExtensions: ['js'],
+      enableCaching: true
+    });
+
+    const fixtureBuilder = new fixture.Builder(node);
+
+    const run1Start = process.hrtime()
+    let outputHash = await fixtureBuilder.build(node);
+    const run1End = process.hrtime(run1Start)
+    assert.deepStrictEqual(outputHash, {
+      'test-support.js': fs.readFileSync(`${fixturePath}/output/test-support.js`).toString()
+    });
+
+    const run2Start = process.hrtime()
+    outputHash = await fixtureBuilder.build(node);
+    const run2End = process.hrtime(run2Start);
+    assert.deepStrictEqual(outputHash, {
+      'test-support.js': fs.readFileSync(`${fixturePath}/output/test-support.js`).toString()
+    });
+    
+    const run1DurationMs = (run1End[0] * 1000000000 + run1End[1]) / 1000000;
+    const run2DurationMs = (run2End[0] * 1000000000 + run2End[1]) / 1000000;
+    assert.ok(run2DurationMs < (run1DurationMs / 2), `cache should make second run (${run2DurationMs}ms) at least twice as fast as first run (${run1DurationMs}ms)`);
+    fixtureBuilder.cleanup();
+  });
+
+  it('ignores JavaScript comments with URLs', async function () {
+    let inputNode = new fixture.Node({
+      'snippet.js': `/**
+      here's some code.
+      
+      it does things.
+      
+      for example:
+      
+      \`\`\`app/app.js
+      do not rewrite this snippet
+      \`\`\`
+      */
+      (function x() { return true; })
+      `
+    });
+    let node = new AssetRewrite(inputNode, {
       replaceExtensions: ['js'],
       assetMap: {
         'the.map': 'the-other-map',
@@ -243,10 +412,52 @@ describe('broccoli-asset-rev', function() {
       },
       prepend: '/'
     });
-
-    builder = new broccoli.Builder(node);
-    return builder.build().then(function (graph) {
-      confirmOutput(graph.directory, sourcePath + '/output');
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'snippet.js': `/**
+      here's some code.
+      
+      it does things.
+      
+      for example:
+      
+      \`\`\`app/app.js
+      do not rewrite this snippet
+      \`\`\`
+      */
+      (function x() { return true; })
+      `
     });
   });
+
+  it('when asset map keys and values are the same with prepend', async function(){
+    let inputNode = new fixture.Node({
+      'assets': {
+        'js-with-image.js': `var path = "/assets/baz/bay.jpg";`,
+        'quoted-script-tag.html': `<script src="/assets/foo/bar/widget.js"></script>`,
+        'unquoted-script-tag.html': `<script src=/assets/foo/bar/widget.js></script>`,
+        'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(/images/sample.png)}`,
+      }
+    });
+    let node = new AssetRewrite(inputNode, {
+      assetMap: {
+        'assets/foo/bar/widget.js': 'assets/foo/bar/widget.js',
+        'assets/baz/bay.jpg': 'assets/baz/bay.jpg',
+        'images/sample.png': 'images/sample.png'
+      },
+      replaceExtensions: ['css', 'html', 'js'],
+      prepend: 'https://cloudfront.net/'
+    });
+
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'assets': {
+        'js-with-image.js': `var path = "https://cloudfront.net/assets/baz/bay.jpg";`,
+        'quoted-script-tag.html': `<script src="https://cloudfront.net/assets/foo/bar/widget.js"></script>`,
+        'unquoted-script-tag.html': `<script src=https://cloudfront.net/assets/foo/bar/widget.js></script>`,
+        'unquoted-url-in-styles.css': `.sample-img{width:50px;height:50px;background-image:url(https://cloudfront.net/images/sample.png)}`,
+      }
+    });
+  })
+
 });
