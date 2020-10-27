@@ -173,7 +173,7 @@ class AssetRewrite extends Filter {
     return newString;
   }
 
-    generateAssetMapKeys () {
+  generateAssetMapKeys () {
     var keys = Object.keys(this.assetMap);
 
     keys.sort(function (a, b) {
@@ -199,4 +199,6 @@ function escapeRegExp(string) {
   return string.replace(/([.*+?^${}()|\[\]\/\\])/g, "\\$1");
 }
 
-module.exports = AssetRewrite;
+module.exports = function() {
+  return new AssetRewrite(...arguments);
+}

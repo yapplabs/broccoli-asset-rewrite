@@ -460,4 +460,18 @@ describe('broccoli-asset-rev', function() {
     });
   })
 
+  it('can be used without "new"', async function() { // important for backward-compatibility
+    let inputNode = new fixture.Node({
+      'quoted-script-tag.html': `<script src="foo/bar/widget.js"></script>`,
+    });
+    let node = AssetRewrite(inputNode, {
+      assetMap: {
+        'foo/bar/widget.js': 'blahzorz-1.js',
+      }
+    });
+    let outputHash = await fixture.build(node);
+    assert.deepStrictEqual(outputHash, {
+      'quoted-script-tag.html': `<script src="blahzorz-1.js"></script>`,
+    });
+  });
 });
